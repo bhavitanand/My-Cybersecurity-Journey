@@ -168,8 +168,8 @@ A dummy 32-bit Linux binary was provided locally, with the real challenge runnin
 
 2. Found `vuln()`: it reads up to 200 bytes (`read(0, buf, 0xc8)`) into a 68-byte stack buffer — no bounds checking, classic stack buffer overflow. Also found a `win()` function that's never called during normal execution but is clearly meant to print the flag.
 
-<img width="2226" height="1360" alt="image" src="https://github.com/user-attachments/assets/f99e0f4e-c34b-472c-b4da-ec1bc7141179" />
-<img width="2397" height="1393" alt="image" src="https://github.com/user-attachments/assets/c1dc4916-560c-4c16-8048-921519e1beb0" />
+<img width="2036" height="1325" alt="Image 11" src="https://github.com/user-attachments/assets/bf4b0f6f-8d4f-4915-8443-10f88f0449a8" />
+<img width="2043" height="1328" alt="Also Image 11" src="https://github.com/user-attachments/assets/43ba2031-6e90-4247-ae9b-1ead6cb3a3bd" />
 
 3. Worked out the stack layout: 68 bytes of buffer + 4 bytes saved `ebx` + 4 bytes saved `ebp` = **76 bytes** before hitting the saved return address. Since there's no PIE/ASLR to defeat, `win()` sits at a fixed, known address.
 
