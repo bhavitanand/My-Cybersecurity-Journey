@@ -54,10 +54,10 @@ Steps taken:
 
 <img width="1327" height="757" alt="Image 2" src="https://github.com/user-attachments/assets/26afaa4b-4838-41af-8c0b-4a1c6692c96e" />
 
-2. The output was readable-ish (letters, digits, underscores, curly braces) but started with `BAIN{` instead of the expected `BYTE{` — so Base64 alone wasn't the whole cipher. There was a second layer on top, applied _before_ the Base64 encoding.
+2. The output was readable-ish (letters, digits, underscores, curly braces) but started with `BAIN{` instead of the expected `BYTE{` and so Base64 alone wasn't the whole cipher. There was a second layer on top, applied _before_ the Base64 encoding.
 
 3. First ruled out the obvious simple options:
-   - A single Caesar shift — doesn't work, because the shift needed to turn each letter of `BAIN` into the matching letter of `BYTE` isn't constant (B→B is a shift of 0, but A→Y and I→T and N→E are different shifts each)
+   - A single Caesar shift doesn't work, because the shift needed to turn each letter of `BAIN` into the matching letter of `BYTE` isn't constant (B→B is a shift of 0, but A→Y and I→T and N→E are different shifts each)
    - Atbash, ROT47, plain reversal; none of these reproduced `BYTE{` either
 
 <img width="1507" height="777" alt="Image 3" src="https://github.com/user-attachments/assets/f902a52d-c366-47a5-a02e-1629e0f76487" />
@@ -118,16 +118,16 @@ Steps taken:
 
 <img width="2557" height="1437" alt="Image 5" src="https://github.com/user-attachments/assets/987fe280-e347-4def-92a0-63a17f25b73c" />
 
-2. Searched the raw hex for the literal chunk-type markers (`IDAT`, `IEND`) rather than trusting the declared chunk-length fields, and compared their real spacing against what the lengths claimed. This exposed a **fake 12-byte `IEND` chunk** (a zero-length IEND, complete with its standard checksum `AE 42 60 82`) spliced into the middle of one of the real `IDAT` chunks — enough to make naive parsers think the file ends early.
+2. Searched the raw hex for the literal chunk-type markers (`IDAT`, `IEND`) rather than trusting the declared chunk-length fields, and compared their real spacing against what the lengths claimed. This exposed a **fake 12-byte `IEND` chunk** (a zero-length IEND, complete with its standard checksum `AE 42 60 82`) spliced into the middle of one of the real `IDAT` chunks, enough to make naive parsers think the file ends early.
 
 <img width="1236" height="217" alt="Image 6" src="https://github.com/user-attachments/assets/8ea05e6f-c25c-4c87-ab54-84e231556443" />
 <img width="1247" height="362" alt="Also Image 6" src="https://github.com/user-attachments/assets/81ac3c21-44da-4cd6-89e5-fe241231d31c" />
 
-3. Removed those 12 bytes (wrote a short Python script to do the byte surgery cleanly, rather than editing raw hex by hand). Confirmed each chunk's CRC with a script afterward — the `IHDR` chunk's checksum was _also_ invalid, which I patched by recomputing it.
+3. Removed those 12 bytes (wrote a short Python script to do the byte surgery cleanly, rather than editing raw hex by hand). Confirmed each chunk's CRC with a script afterward, the `IHDR` chunk's checksum was _also_ invalid, which I patched by recomputing it.
 
 <img width="2496" height="460" alt="Image 7" src="https://github.com/user-attachments/assets/f25137a5-a5df-4dd3-8564-0e9dbd2097cb" />
 
-4. Even after both fixes, the file loaded — but the decompressed pixel data was larger than the declared `724×800` dimensions should produce. Dividing the leftover bytes by the per-row size (`width*3 + 1`) gave exactly 50 extra rows — meaning the real image was **850px tall**, and the header was lying about the height to hide the bottom strip from ever being rendered.
+4. Even after both fixes, the file loaded but the decompressed pixel data was larger than the declared `724×800` dimensions should produce. Dividing the leftover bytes by the per-row size (`width*3 + 1`) gave exactly 50 extra rowsL, meaning the real image was **850px tall**, and the header was lying about the height to hide the bottom strip from ever being rendered.
 
 <img width="724" height="800" alt="Image 8" src="https://github.com/user-attachments/assets/759cd74c-3045-4eed-8e0a-3b0725b7ca76" />
 
@@ -166,7 +166,7 @@ A dummy 32-bit Linux binary was provided locally, with the real challenge runnin
 
 <img width="1307" height="287" alt="Image 10" src="https://github.com/user-attachments/assets/a1efd456-ac28-445f-ad20-698848579e3c" />
 
-2. Found `vuln()`: it reads up to 200 bytes (`read(0, buf, 0xc8)`) into a 68-byte stack buffer — no bounds checking, classic stack buffer overflow. Also found a `win()` function that's never called during normal execution but is clearly meant to print the flag.
+2. Found `vuln()`: it reads up to 200 bytes (`read(0, buf, 0xc8)`) into a 68-byte stack buffer, no bounds checking, classic stack buffer overflow. Also found a `win()` function that's never called during normal execution but is clearly meant to print the flag.
 
 <img width="2036" height="1325" alt="Image 11" src="https://github.com/user-attachments/assets/bf4b0f6f-8d4f-4915-8443-10f88f0449a8" />
 <img width="2043" height="1328" alt="Also Image 11" src="https://github.com/user-attachments/assets/43ba2031-6e90-4247-ae9b-1ead6cb3a3bd" />
@@ -205,7 +205,7 @@ print(io.recvall(timeout=3).decode())
 
 ### Reflection
 
-This was my first time going from "read the disassembly" to "write and run a working remote exploit" rather than following a guided walkthrough. The concept (overflow a buffer to control the return address) made sense quickly from a DFIR angle — I already think about memory/stack layout from a forensics lens — but translating that understanding into working exploit code is a gap I want to close by actually learning pwntools properly rather than leaning on AI for it next time.
+This was my first time going from "read the disassembly" to "write and run a working remote exploit" rather than following a guided walkthrough. The concept (overflow a buffer to control the return address) made sense quickly from a DFIR angle. I already think about memory/stack layout from a forensics lens but translating that understanding into working exploit code is a gap I want to close by actually learning pwntools properly rather than leaning on AI for it next time.
 
 ---
 
@@ -214,7 +214,7 @@ This was my first time going from "read the disassembly" to "write and run a wor
 - Known-plaintext / crib-based thinking is a genuinely useful crypto technique, not just a "cheat"
 - File-format-level forensics (chunk structure, headers, checksums) transfers surprisingly well into stego
 - I can read and reason about a binary vulnerability competently; I need to build independent scripting fluency so I'm not relying on AI assistance for exploit code
-- "Corrupted" doesn't always mean complex — two of three tasks here came down to a file lying about its own structure
+- "Corrupted" doesn't always mean complex, two of three tasks here came down to a file lying about its own structure
 
 ---
 
@@ -233,10 +233,10 @@ This was my first time going from "read the disassembly" to "write and run a wor
 
 - Build real pwntools/scripting fluency instead of leaning on AI for exploit code
 - Get more deliberate practice with classical/layered ciphers so crypto stops being my weak point
-- Keep leaning into file-format-level forensics — it's clearly a strength
+- Keep leaning into file-format-level forensics, it's clearly a strength
 
 ---
 
 ## Closing Note
 
-Three very different domains, three very different ways of getting stuck — and in each case, the unlock was questioning an assumption the challenge wanted me to make (that the cipher had to be guessed blind, that the image was broken rather than lying, that exploitation required more scripting skill than I currently have rather than just understanding the primitive). Write-ups like this are part of how I track that.
+Three very different domains, three very different ways of getting stuck and in each case, the unlock was questioning an assumption the challenge wanted me to make (that the cipher had to be guessed blind, that the image was broken rather than lying, that exploitation required more scripting skill than I currently have rather than just understanding the primitive). Write-ups like this are part of how I track that.
