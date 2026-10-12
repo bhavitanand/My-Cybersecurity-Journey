@@ -1,6 +1,6 @@
 # [BYTE Cybersecurity Recruitment Task 2026](https://bytesoc.dev/tasks/cybersecurity)
 
-**Date Completed:** [DATE]
+**Date Completed:** 4/10/2026
 **Difficulty:** Beginner–Intermediate
 **Format:** Multi-domain CTF (Cryptography, Steganography, Binary Exploitation)
 **Context:** Society recruitment challenge
