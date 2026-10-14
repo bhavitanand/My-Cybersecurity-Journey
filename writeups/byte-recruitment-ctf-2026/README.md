@@ -18,7 +18,7 @@ Each task forced a different kind of thinking:
 - **Steganography** required understanding the raw PNG file format well enough to manually patch a corrupted file byte-by-byte
 - **Binary Exploitation** required reading x86 disassembly, understanding stack layout, and writing/running a real exploit against a live remote service
 
-I used Claude for parts of this, mainly to help write the exploit script for Task 3, since scripting isn't my strong suit yet, and as a guide for tools/workflow on stego, which I have ~zero prior experience with. I made sure to understand the reasoning behind every step rather than blind copy-pasting; the crypto key derivation in Task 1 specifically was something I worked out myself from the pattern in the output.
+I used Claude for parts of this, mainly to help write the exploit script for Task 3, since scripting isn't my strong suit yet, and as a guide for tools/workflow on stego, which I have ~zero prior experience with. I made sure to understand the reasoning behind every step rather than blind copy-pasting; the crypto key derivation in Task 1 specifically was something I worked out myself from the pattern in the output, though as the Task 1 write-up below shows, my first attempt at it (Vigenère) actually produced the wrong flag, and the real one turned out to be Beaufort instead.
 
 ---
 
@@ -26,7 +26,7 @@ I used Claude for parts of this, mainly to help write the exploit script for Tas
 
 | Task   | Category            | Focus                                                |
 | ------ | ------------------- | ---------------------------------------------------- |
-| Task 1 | Cryptography        | Base64 + known-plaintext Vigenère cracking           |
+| Task 1 | Cryptography        | Base64 + known-plaintext cipher cracking (Vigenère → Beaufort) |
 | Task 2 | Steganography       | PNG chunk structure corruption + manual repair       |
 | Task 3 | Binary Exploitation | Stack buffer overflow (ret2win), remote exploitation |
 
@@ -81,20 +81,39 @@ Steps taken:
 <img width="1350" height="775" alt="Image 4" src="https://github.com/user-attachments/assets/233dfc3a-f976-467b-a6af-aa4679677b04" />
 <img width="1752" height="916" alt="Also Image 4" src="https://github.com/user-attachments/assets/2bb992ec-c480-4286-916a-aacb6de1cd7d" />
 
-6. This produced a clean `BYTE{...}` flag. One nice confirmation that this was the right key (and not a coincidence): one segment of the decoded flag, `bY73`, reads as the word **"byte"** in leetspeak (7→T, 3→E).. a thematically perfect easter egg for a flag from the BYTE society, and not something that would show up from a wrong key.
+6. This produced a flag-shaped output (`BYTE{bY73_B8I_ApsYC_V4jXcB}`) that looked genuinely plausible, clean format, and one segment (`bY73`) even read as "byte" in leetspeak. But I'd only solved for 4 letters of key against a 4-letter crib, which meant the key was mathematically forced to fit regardless of whether Vigenère was actually the right cipher. Additionally the derived key, `ACPJ`, didn't spell anything. For a CTF author choosing a key by hand, a meaningless 4-letter string is a weak sign.
+
+7. After this Beaufort cipher came up as the other obvious candidate; since it's considered Vigenère's close cousin, but the key math is addition instead of subtraction: `key_letter = (plain_letter + cipher_letter) mod 26`. Redid the same hand derivation with that formula instead:
+
+   | Position | Plaintext | Ciphertext | Sum (key letter) |
+   | -------- | --------- | ---------- | ----------------- |
+   | 0        | B         | B          | 2 → **C**          |
+   | 1        | Y         | A          | 24 → **Y**         |
+   | 2        | T         | I          | 1 → **B**          |
+   | 3        | E         | N          | 17 → **R**         |
+
+   This time the key came out to **`CYBR`** — which reads as **"cyber"**, an actual word, and a much stronger signal than `ACPJ` ever was.
+
+8. Ran the Base64-decoded string through CyberChef's **"Beaufort Cipher Decode"** operation with key `CYBR`:
+
+<img width="1610" height="1435" alt="image" src="https://github.com/user-attachments/assets/28a54830-4971-4ff5-856d-a6dd4098dc76" />
+
+   This produced the actual flag, confirming Beaufort was correct and Vigenère had just gotten lucky enough on format to look right.
 
 ---
 
 ### Result
 
 **Flag:**
-`BYTE{bY73_B8I_ApsYC_V4jXcB}`
+`BYTE{bY73_L8A_ChuKA_B4dLaV}`
 
 ---
 
 ### Reflection
 
 This was the task I was somewhat confident going in, since cryptography is something I really enjoy working with. Although I got a bit side-tracked initially, what eventually saved it was treating the _expected flag format_ itself as information instead of trying to brute-force an unknown cipher or just purely relying on the "Magic" function of CyberChef. Using the known `BYTE{` prefix as a crib turned an open-ended guessing problem into a solvable equation. That's a technique (known-plaintext attack) I remember applying in a few CTFs before this challenge.
+
+Where I actually slipped up: a 4-letter crib against a 4-letter repeating key is always going to be solvable, for basically any cipher in the Vigenère family, that doesn't confirm which cipher is correct, only that *a* key exists that fits. I noticed the "byte" leetspeak coincidence and let it override a better signal I had right in front of me: the key itself was gibberish. Beaufort's key spelling "cyber" is the kind of thing a challenge author actually picks on purpose. Lesson for next time: when a crib-derived key doesn't read as anything, that's worth treating as a red flag before trusting the output, not after.
 
 ---
 
@@ -221,6 +240,7 @@ This was my first time going from "read the disassembly" to "write and run a wor
 ## Tools & Platforms Used
 
 - CyberChef (Base64 decoding, Vigenère decode)
+- Boxentriq (Beaufort Cipher decode)
 - Hex editor (HxD) / `pngcheck`
 - Python (short patch/CRC scripts for Task 2; pwntools for Task 3)
 - Ghidra / objdump (disassembly for Task 3)
